@@ -27,3 +27,4 @@ json处理，特点是Rapid。
 
 * 这只是常用库的扩展，首先你得安装了xLua
 * 这几个库的使用请查阅相关文档
+* 由于时间的关系，这不一定能做到和xLua版本总是同步，如果xLua报“wrong lib version ...”信息的话，请把https://github.com/Tencent/xLua/tree/master/build下的除CMakeLists.txt之外的文件目录，覆盖到https://github.com/chexiongsheng/build_xlua_with_libs/tree/master/build目录。
