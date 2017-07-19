@@ -148,7 +148,7 @@ end)
 
 在2.1.5~2.1.6版本把这个特性去掉，因为：1、这个特性会导致基类定义的方法、属性、字段等无法访问（比如Animation无法访问到GetComponent方法）；2、key为当前类某方法、属性、字段的名字的数据无法检索，比如Dictionary类型，dic['TryGetValue']返回的是一个函数，指向Dictionary的TryGetValue方法。
 
-建议直接方法该操作符的等效方法，比如List的Get，Dictionary的TryGetValue，如果该方法没有提供，可以在C#那通过Extension method封装一个使用。
+建议直接方法该操作符的等效方法，比如Dictionary的TryGetValue，如果该方法没有提供，可以在C#那通过Extension method封装一个使用。
 
 ## 有的Unity对象，在C#为null，在lua为啥不为nil呢？比如一个已经Destroy的GameObject
 
@@ -176,11 +176,38 @@ print(go:GetComponent('Animator'):IsNull())
 
 ## 泛型实例怎么构造
 
-泛型实例的构造和普通类型是一样的，都是CS.namespace.typename()，可能比较特殊的是typename的表达，泛型实例的typename的表达包含了标识符非法符号，最后一部分要换成["typename"]，以List<string>为例
+涉及的类型都在mscorlib，Assembly-CSharp程序集的话，泛型实例的构造和普通类型是一样的，都是CS.namespace.typename()，可能比较特殊的是typename的表达，泛型实例的typename的表达包含了标识符非法符号，最后一部分要换成["typename"]，以List<string>为例
 
 ~~~lua
 local lst = CS.System.Collections.Generic["List`1[System.String]"]()
 ~~~
 
 如果某个泛型实例的typename不确定，可以在C#测打印下typeof(不确定的类型).ToString()
+
+如果涉及mscorlib，Assembly-CSharp程序集之外的类型的话，可以用C#的反射来做：
+
+~~~lua
+local dic = CS.System.Activator.CreateInstance(CS.System.Type.GetType('System.Collections.Generic.Dictionary`2[[System.String, mscorlib],[UnityEngine.Vector3, UnityEngine]],mscorlib'))
+dic:Add('a', CS.UnityEngine.Vector3(1, 2, 3))
+print(dic:TryGetValue('a'))
+~~~
+
+## 调用LuaEnv.Dispose时，报“try to dispose a LuaEnv with C# callback!”错是什么原因？
+
+这是由于C#还存在指向lua虚拟机里头某个函数的delegate，为了防止业务在虚拟机释放后调用这些无效（因为其引用的lua函数所在虚拟机都释放了）delegate导致的异常甚至崩溃，做了这个检查。
+
+怎么解决？释放这些delegate即可，所谓释放，在C#中，就是没有引用：
+
+你是在C#通过LuaTable.Get获取并保存到对象成员，赋值该成员为null；
+
+你是在lua那把lua函数注册到一些事件事件回调，反注册这些回调；
+
+如果你是通过xlua.hotfix(class, method, func)注入到C#，则通过xlua.hotfix(class, method, nil)删除；
+
+要注意以上操作在Dispose之前完成。
+
+## C#参数（或字段）类型是object时，传递整数默认是以long类型传递，如何指明其它类型？比如int
+
+看[例子11](../Examples/11_RawObject/RawObjectTest.cs)
+
 

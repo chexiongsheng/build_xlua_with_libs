@@ -269,19 +269,6 @@ namespace XLua
             }
         }
 
-        static Dictionary<string, string> support_op = new Dictionary<string, string>()
-        {
-            { "op_Addition", "__add" },
-            { "op_Subtraction", "__sub" },
-            { "op_Multiply", "__mul" },
-            { "op_Division", "__div" },
-            { "op_Equality", "__eq" },
-            { "op_UnaryNegation", "__unm" },
-            { "op_LessThan", "__lt" },
-            { "op_LessThanOrEqual", "__le" },
-            { "op_Modulus", "__mod" }
-        };
-
         static LuaCSFunction genItemGetter(Type type, PropertyInfo[] props)
         {
             props = props.Where(prop => !prop.GetIndexParameters()[0].ParameterType.IsAssignableFrom(typeof(string))).ToArray();
@@ -389,15 +376,21 @@ namespace XLua
         {
             return (RealStatePtr L) =>
             {
-                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
-                return translator.TranslateToEnumToTop(L, type, 1);
+                try
+                {
+                    ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+                    return translator.TranslateToEnumToTop(L, type, 1);
+                }
+                catch(Exception e)
+                {
+                    return LuaAPI.luaL_error(L, "cast to " + type + " exception:" + e);
+                }
             };
         }
 
-        static Dictionary<Type, IEnumerable<MethodInfo>> extension_method_map = null;
         static IEnumerable<MethodInfo> GetExtensionMethodsOf(Type type_to_be_extend)
         {
-            if (extension_method_map == null)
+            if (InternalGlobals.extensionMethodMap == null)
             {
                 List<Type> type_def_extention_method = new List<Type>();
 
@@ -469,13 +462,13 @@ namespace XLua
                 }
                 enumerator.Dispose();
 
-                extension_method_map = (from type in type_def_extention_method
+                InternalGlobals.extensionMethodMap = (from type in type_def_extention_method
                                         from method in type.GetMethods(BindingFlags.Static | BindingFlags.Public)
                                         where IsSupportedExtensionMethod(method)
                                         group method by getExtendedType(method)).ToDictionary(g => g.Key, g => g as IEnumerable<MethodInfo>);
             }
             IEnumerable<MethodInfo> ret = null;
-            extension_method_map.TryGetValue(type_to_be_extend, out ret);
+            InternalGlobals.extensionMethodMap.TryGetValue(type_to_be_extend, out ret);
             return ret;
         }
 
@@ -500,7 +493,7 @@ namespace XLua
                 if (private_access)
                 {
                     // skip hotfix inject field
-                    if (field.IsStatic && (field.Name.StartsWith("__Hitfix") || field.Name.StartsWith("_c__Hitfix")) && typeof(Delegate).IsAssignableFrom(field.FieldType))
+                    if (field.IsStatic && (field.Name.StartsWith("__Hotfix") || field.Name.StartsWith("_c__Hotfix")) && typeof(Delegate).IsAssignableFrom(field.FieldType))
                     {
                         continue;
                     }
@@ -580,7 +573,7 @@ namespace XLua
 
                 if (method_name.StartsWith("op_")) // 操作符
                 {
-                    if (support_op.ContainsKey(method_name))
+                    if (InternalGlobals.supportOp.ContainsKey(method_name))
                     {
                         if (overloads == null)
                         {
@@ -618,11 +611,32 @@ namespace XLua
                 }
             }
 
+
+            IEnumerable<MethodInfo> extend_methods = GetExtensionMethodsOf(type);
+            if (extend_methods != null)
+            {
+                foreach (var extend_method in extend_methods)
+                {
+                    MethodKey method_key = new MethodKey { Name = extend_method.Name, IsStatic = false };
+                    List<MemberInfo> overloads;
+                    if (pending_methods.TryGetValue(method_key, out overloads))
+                    {
+                        overloads.Add(extend_method);
+                        continue;
+                    }
+                    else
+                    {
+                        overloads = new List<MemberInfo>() { extend_method };
+                        pending_methods.Add(method_key, overloads);
+                    }
+                }
+            }
+
             foreach (var kv in pending_methods)
             {
                 if (kv.Key.Name.StartsWith("op_")) // 操作符
                 {
-                    LuaAPI.xlua_pushasciistring(L, support_op[kv.Key.Name]);
+                    LuaAPI.xlua_pushasciistring(L, InternalGlobals.supportOp[kv.Key.Name]);
                     translator.PushFixCSFunction(L,
                         new LuaCSFunction(translator.methodWrapsCache._GenMethodWrap(type, kv.Key.Name, kv.Value.ToArray()).Call));
                     LuaAPI.lua_rawset(L, obj_meta);
@@ -633,17 +647,6 @@ namespace XLua
                     translator.PushFixCSFunction(L,
                         new LuaCSFunction(translator.methodWrapsCache._GenMethodWrap(type, kv.Key.Name, kv.Value.ToArray()).Call));
                     LuaAPI.lua_rawset(L, kv.Key.IsStatic ? cls_field : obj_field);
-                }
-            }
-
-            IEnumerable<MethodInfo> extend_methods = GetExtensionMethodsOf(type);
-            if (extend_methods != null)
-            {
-                foreach (var kv in (from extend_method in extend_methods select (MemberInfo)extend_method into member group member by member.Name))
-                {
-                    LuaAPI.xlua_pushasciistring(L, kv.Key);
-                    translator.PushFixCSFunction(L, new LuaCSFunction(translator.methodWrapsCache._GenMethodWrap(type, kv.Key, kv).Call));
-                    LuaAPI.lua_rawset(L, obj_field);
                 }
             }
         }
@@ -928,10 +931,10 @@ namespace XLua
             return idx > 0 ? idx : top + idx + 1;
         }
 
-        public static readonly int OBJ_META_IDX = -4;
-        public static readonly int METHOD_IDX = -3;
-        public static readonly int GETTER_IDX = -2;
-        public static readonly int SETTER_IDX = -1;
+        public const int OBJ_META_IDX = -4;
+        public const int METHOD_IDX = -3;
+        public const int GETTER_IDX = -2;
+        public const int SETTER_IDX = -1;
 
         public static void EndObjectRegister(Type type, RealStatePtr L, ObjectTranslator translator, LuaCSFunction csIndexer,
             LuaCSFunction csNewIndexer, Type base_type, LuaCSFunction arrayIndexer, LuaCSFunction arrayNewIndexer)
@@ -1083,10 +1086,10 @@ namespace XLua
             LuaAPI.lua_setmetatable(L, cls_table);
         }
 
-        public static readonly int CLS_IDX = -4;
-        public static readonly int CLS_META_IDX = -3;
-        public static readonly int CLS_GETTER_IDX = -2;
-        public static readonly int CLS_SETTER_IDX = -1;
+        public const int CLS_IDX = -4;
+        public const int CLS_META_IDX = -3;
+        public const int CLS_GETTER_IDX = -2;
+        public const int CLS_SETTER_IDX = -1;
 
         public static void EndClassRegister(Type type, RealStatePtr L, ObjectTranslator translator)
         {
@@ -1228,13 +1231,13 @@ namespace XLua
             LuaAPI.lua_pop(L, 1);
         }
 
-        public static string LuaIndexsFieldName = "LuaIndexs";
+        public const string LuaIndexsFieldName = "LuaIndexs";
 
-        public static string LuaNewIndexsFieldName = "LuaNewIndexs";
+        public const string LuaNewIndexsFieldName = "LuaNewIndexs";
 
-        public static string LuaClassIndexsFieldName = "LuaClassIndexs";
+        public const string LuaClassIndexsFieldName = "LuaClassIndexs";
 
-        public static string LuaClassNewIndexsFieldName = "LuaClassNewIndexs";
+        public const string LuaClassNewIndexsFieldName = "LuaClassNewIndexs";
 
         public static bool IsParamsMatch(MethodInfo delegateMethod, MethodInfo bridgeMethod)
         {
@@ -1284,41 +1287,6 @@ namespace XLua
                 }
             }
             return hasValidGenericParameter;
-        }
-
-        public static bool IsSupportedExtensionMethod(MethodBase method,Type extendedType)
-        {
-            if (!method.IsDefined(typeof(ExtensionAttribute), false))
-                return false;
-            var methodParameters = method.GetParameters();
-            if (methodParameters.Length < 1)
-                return false;
-
-            var hasValidGenericParameter = false;
-            for (var i = 0; i < methodParameters.Length; i++)
-            {
-                var parameterType = methodParameters[i].ParameterType;
-                if (i == 0)
-                {
-                    if (parameterType.IsGenericParameter)
-                    {
-                        var parameterConstraints = parameterType.GetGenericParameterConstraints();
-                        if (parameterConstraints.Length == 0 || !parameterConstraints[0].IsAssignableFrom(extendedType))
-                            return false;
-                        hasValidGenericParameter = true;
-                    }
-                    else if (!parameterType.IsAssignableFrom(extendedType))
-                        return false;
-                }
-                else if (parameterType.IsGenericParameter)
-                {
-                    var parameterConstraints = parameterType.GetGenericParameterConstraints();
-                    if (parameterConstraints.Length == 0 || !parameterConstraints[0].IsClass())
-                        return false;
-                    hasValidGenericParameter = true;
-                }
-            }
-            return hasValidGenericParameter || !method.ContainsGenericParameters;
         }
 
         private static Type getExtendedType(MethodInfo method)

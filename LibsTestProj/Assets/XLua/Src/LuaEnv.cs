@@ -49,7 +49,7 @@ namespace XLua
         internal object luaEnvLock = new object();
 #endif
 
-        const int LIB_VERSION_EXPECT = 100;
+        const int LIB_VERSION_EXPECT = 101;
 
         public LuaEnv()
         {
@@ -390,10 +390,7 @@ namespace XLua
                 LuaAPI.lua_close(L);
 
                 ObjectTranslatorPool.Instance.Remove(L);
-                if (translator != null)
-                {
-                    translator = null;
-                }
+                translator = null;
 
                 rawL = IntPtr.Zero;
 
@@ -527,13 +524,19 @@ namespace XLua
                         k = 'ctor'
                     end
                     local f = type(v) == 'function' and v or nil
-                    xlua.access(cs, cflag .. '__Hitfix0_'..k, f) -- at least one
+                    xlua.access(cs, cflag .. '__Hotfix0_'..k, f) -- at least one
                     pcall(function()
                         for i = 1, 99 do
-                            xlua.access(cs, '__Hitfix'..i..'_'..k, f)
+                            xlua.access(cs, cflag .. '__Hotfix'..i..'_'..k, f)
                         end
                     end)
                 end
+            end
+            xlua.getmetatable = function(cs)
+                return xlua.metatable_operation(cs)
+            end
+            xlua.setmetatable = function(cs, mt)
+                return xlua.metatable_operation(cs, mt)
             end
             ";
 

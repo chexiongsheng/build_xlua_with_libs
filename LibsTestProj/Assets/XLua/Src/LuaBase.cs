@@ -79,7 +79,7 @@ namespace XLua
 
         public override bool Equals(object o)
         {
-            if (this.GetType() == o.GetType())
+            if (o != null && this.GetType() == o.GetType())
             {
 #if THREAD_SAFT || HOTFIX_ENABLE
                 lock (luaEnv.luaEnvLock)
@@ -87,6 +87,8 @@ namespace XLua
 #endif
                     LuaBase rhs = (LuaBase)o;
                     var L = luaEnv.L;
+                    if (L != rhs.luaEnv.L)
+                        return false;
                     int top = LuaAPI.lua_gettop(L);
                     LuaAPI.lua_getref(L, rhs.luaReference);
                     LuaAPI.lua_getref(L, luaReference);
@@ -102,7 +104,7 @@ namespace XLua
 
         public override int GetHashCode()
         {
-            return luaReference;
+            return luaReference + ((luaEnv != null) ? luaEnv.L.ToInt32() : 0);
         }
 
         internal virtual void push(RealStatePtr L)
