@@ -98,6 +98,10 @@ namespace XLua
         }
     }
 
+#if GEN_CODE_MINIMIZE
+    public delegate int CSharpWrapper(IntPtr L, int top);
+#endif
+
     public partial class ObjectTranslator
 	{
         internal MethodWrapsCache methodWrapsCache;
@@ -284,15 +288,7 @@ namespace XLua
                 List<Type> cs_call_lua = new List<Type>();
                 foreach (var type in Utils.GetAllTypes())
                 {
-                    if (!type.IsInterface() && typeof(GenConfig).IsAssignableFrom(type))
-                    {
-                        var cfg = Activator.CreateInstance(type) as GenConfig;
-                        if (cfg.CSharpCallLua != null)
-                        {
-                            cs_call_lua.AddRange(cfg.CSharpCallLua);
-                        }
-                    }
-                    else if(type.IsDefined(typeof(CSharpCallLuaAttribute), false))
+                    if(type.IsDefined(typeof(CSharpCallLuaAttribute), false))
                     {
                         cs_call_lua.Add(type);
                     }
@@ -476,7 +472,7 @@ namespace XLua
                 };
                 interfaceBridgeCreators.Add(interfaceType, creator);
 #else
-                throw new InvalidCastException("This interface must add to CSharpCallLua: " + interfaceType);
+                throw new InvalidCastException("This type must add to CSharpCallLua: " + interfaceType);
 #endif
             }
             LuaAPI.lua_pushvalue(L, idx);
@@ -751,6 +747,21 @@ namespace XLua
             }
         }
 
+#if GENERIC_SHARING
+        public T GetByType<T>(RealStatePtr L, int index)
+        {
+            Func<RealStatePtr, int, T> get_func;
+            if (tryGetGetFuncByType(typeof(T), out get_func))
+            {
+                return get_func(L, index);
+            }
+            else
+            {
+                return (T)GetObject(L, index, typeof(T));
+            }
+        }
+#endif
+
         public T[] GetParams<T>(RealStatePtr L, int index)
         {
             T[] ret = new T[Math.Max(LuaAPI.lua_gettop(L) - index + 1, 0)];
@@ -848,6 +859,15 @@ namespace XLua
                 }
                 else
                 {
+                    if (type.IsEnum)
+                    {
+                        LuaAPI.xlua_pushasciistring(L, "__band");
+                        LuaAPI.lua_pushstdcallcfunction(L, metaFunctions.EnumAndMeta);
+                        LuaAPI.lua_rawset(L, -3);
+                        LuaAPI.xlua_pushasciistring(L, "__bor");
+                        LuaAPI.lua_pushstdcallcfunction(L, metaFunctions.EnumOrMeta);
+                        LuaAPI.lua_rawset(L, -3);
+                    }
                     LuaAPI.lua_pushvalue(L, -1);
                     type_id = LuaAPI.luaL_ref(L, LuaIndexes.LUA_REGISTRYINDEX);
                     LuaAPI.lua_pushnumber(L, type_id);
@@ -1123,7 +1143,7 @@ namespace XLua
             }
             else if (objects.TryGetValue(udata, out obj))
             {
-#if !UNITY_5 && !XLUA_GENERAL
+#if !UNITY_5 && !XLUA_GENERAL && !UNITY_2017
                 if (obj != null && obj is UnityEngine.Object && ((obj as UnityEngine.Object) == null))
                 {
                     //throw new UnityEngine.MissingReferenceException("The object of type '"+ obj.GetType().Name +"' has been destroyed but you are still trying to access it.");
@@ -1165,6 +1185,50 @@ namespace XLua
                 LuaAPI.lua_pushstdcallcfunction(L, metaFunctions.FixCSFunctionWraper, 1);
             }
         }
+
+#if GEN_CODE_MINIMIZE
+        CSharpWrapper[] csharpWrapper = new CSharpWrapper[0];
+        int csharpWrapperSize = 0;
+
+        internal int CallCSharpWrapper(RealStatePtr L, int funcidx, int top)
+        {
+            return csharpWrapper[funcidx](L, top);
+        }
+
+        void ensureCSharpWrapperCapacity(int min)
+        {
+            if (csharpWrapper.Length < min)
+            {
+                int num = (csharpWrapper.Length == 0) ? 4 : (csharpWrapper.Length * 2);
+                if (num > 2146435071)
+                {
+                    num = 2146435071;
+                }
+                if (num < min)
+                {
+                    num = min;
+                }
+
+                var array = new CSharpWrapper[num];
+                Array.Copy(csharpWrapper, 0, array, 0, csharpWrapper.Length);
+                csharpWrapper = array;
+            }
+        }
+
+        internal void PushCSharpWrapper(RealStatePtr L, CSharpWrapper func)
+        {
+            if (func == null)
+            {
+                LuaAPI.lua_pushnil(L);
+            }
+            else
+            {
+                LuaAPI.xlua_push_csharp_wrapper(L, csharpWrapperSize);
+                ensureCSharpWrapperCapacity(csharpWrapperSize + 1);
+                csharpWrapper[csharpWrapperSize++] = func;
+            }
+        }
+#endif
 
         internal object[] popValues(RealStatePtr L,int oldTop)
 		{

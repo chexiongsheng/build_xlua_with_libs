@@ -28,6 +28,7 @@ namespace XLua
     {
         public static bool LoadField(RealStatePtr L, int idx, string field_name)
         {
+            idx = idx > 0 ? idx : LuaAPI.lua_gettop(L) + idx + 1;// abs of index
             LuaAPI.xlua_pushasciistring(L, field_name);
             LuaAPI.lua_rawget(L, idx);
             return !LuaAPI.lua_isnil(L, -1);
@@ -408,26 +409,7 @@ namespace XLua
                     {
                         type_def_extention_method.Add(type);
                     }
-                    else if(!type.IsInterface() && typeof(ReflectionConfig).IsAssignableFrom(type))
-                    {
-                        var tmp = (Activator.CreateInstance(type) as ReflectionConfig).ReflectionUse;
-                        if (tmp != null)
-                        {
-                            type_def_extention_method.AddRange(tmp
-                                .Where(t => t.IsDefined(typeof(ExtensionAttribute), false)));
-                        }
-                    }
-#if UNITY_EDITOR || XLUA_GENERAL
-                    else if (!type.IsInterface && typeof(GenConfig).IsAssignableFrom(type))
-                    {
-                        var tmp = (Activator.CreateInstance(type) as GenConfig).CSharpCallLua;
-                        if (tmp != null)
-                        {
-                            type_def_extention_method.AddRange(tmp
-                            .Where(t => t.IsDefined(typeof(ExtensionAttribute), false)));
-                        }
-                    }
-#endif
+
                     if (!type.IsAbstract() || !type.IsSealed()) continue;
 
                     var fields = type.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
@@ -584,14 +566,24 @@ namespace XLua
                     }
                     continue;
                 }
-                else if (method_name.StartsWith("get_") && prop_map.TryGetValue(method.Name.Substring(4), out prop)) // getter of property
+                else if (method_name.StartsWith("get_") && method.IsSpecialName) // getter of property
                 {
+                    string prop_name = method.Name.Substring(4);
+                    if (!prop_map.TryGetValue(prop_name, out prop))
+                    {
+                        prop = type.GetProperty(prop_name);
+                    }
                     LuaAPI.xlua_pushasciistring(L, prop.Name);
                     translator.PushFixCSFunction(L, genPropGetter(type, prop, method.IsStatic));
                     LuaAPI.lua_rawset(L, method.IsStatic ? cls_getter : obj_getter);
                 }
-                else if (method_name.StartsWith("set_") && prop_map.TryGetValue(method.Name.Substring(4), out prop)) // setter of property
+                else if (method_name.StartsWith("set_") && method.IsSpecialName) // setter of property
                 {
+                    string prop_name = method.Name.Substring(4);
+                    if (!prop_map.TryGetValue(prop_name, out prop))
+                    {
+                        prop = type.GetProperty(prop_name);
+                    }
                     LuaAPI.xlua_pushasciistring(L, prop.Name);
                     translator.PushFixCSFunction(L, genPropSetter(type, prop, method.IsStatic));
                     LuaAPI.lua_rawset(L, method.IsStatic ? cls_setter : obj_setter);
@@ -936,8 +928,13 @@ namespace XLua
         public const int GETTER_IDX = -2;
         public const int SETTER_IDX = -1;
 
+#if GEN_CODE_MINIMIZE
+        public static void EndObjectRegister(Type type, RealStatePtr L, ObjectTranslator translator, CSharpWrapper csIndexer,
+            CSharpWrapper csNewIndexer, Type base_type, CSharpWrapper arrayIndexer, CSharpWrapper arrayNewIndexer)
+#else
         public static void EndObjectRegister(Type type, RealStatePtr L, ObjectTranslator translator, LuaCSFunction csIndexer,
             LuaCSFunction csNewIndexer, Type base_type, LuaCSFunction arrayIndexer, LuaCSFunction arrayNewIndexer)
+#endif
         {
             int top = LuaAPI.lua_gettop(L);
             int meta_idx = abs_idx(top, OBJ_META_IDX);
@@ -956,7 +953,11 @@ namespace XLua
             }
             else
             {
+#if GEN_CODE_MINIMIZE
+                translator.PushCSharpWrapper(L, csIndexer);
+#else
                 LuaAPI.lua_pushstdcallcfunction(L, csIndexer);
+#endif
             }
 
             translator.Push(L, type == null ? base_type : type.BaseType());
@@ -969,7 +970,11 @@ namespace XLua
             }
             else
             {
+#if GEN_CODE_MINIMIZE
+                translator.PushCSharpWrapper(L, arrayIndexer);
+#else
                 LuaAPI.lua_pushstdcallcfunction(L, arrayIndexer);
+#endif
             }
 
             LuaAPI.gen_obj_indexer(L);
@@ -997,7 +1002,11 @@ namespace XLua
             }
             else
             {
+#if GEN_CODE_MINIMIZE
+                translator.PushCSharpWrapper(L, csNewIndexer);
+#else
                 LuaAPI.lua_pushstdcallcfunction(L, csNewIndexer);
+#endif
             }
 
             translator.Push(L, type == null ? base_type : type.BaseType());
@@ -1011,7 +1020,11 @@ namespace XLua
             }
             else
             {
+#if GEN_CODE_MINIMIZE
+                translator.PushCSharpWrapper(L, arrayNewIndexer);
+#else
                 LuaAPI.lua_pushstdcallcfunction(L, arrayNewIndexer);
+#endif
             }
 
             LuaAPI.gen_obj_newindexer(L);
@@ -1031,6 +1044,16 @@ namespace XLua
             LuaAPI.lua_pop(L, 4);
         }
 
+#if GEN_CODE_MINIMIZE
+        public static void RegisterFunc(RealStatePtr L, int idx, string name, CSharpWrapper func)
+        {
+            ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+            idx = abs_idx(LuaAPI.lua_gettop(L), idx);
+            LuaAPI.xlua_pushasciistring(L, name);
+            translator.PushCSharpWrapper(L, func);
+            LuaAPI.lua_rawset(L, idx);
+        }
+#else
         public static void RegisterFunc(RealStatePtr L, int idx, string name, LuaCSFunction func)
         {
             idx = abs_idx(LuaAPI.lua_gettop(L), idx);
@@ -1038,6 +1061,7 @@ namespace XLua
             LuaAPI.lua_pushstdcallcfunction(L, func);
             LuaAPI.lua_rawset(L, idx);
         }
+#endif
 
         public static void RegisterObject(RealStatePtr L, ObjectTranslator translator, int idx, string name, object obj)
         {
@@ -1047,9 +1071,17 @@ namespace XLua
             LuaAPI.lua_rawset(L, idx);
         }
 
+#if GEN_CODE_MINIMIZE
+        public static void BeginClassRegister(Type type, RealStatePtr L, CSharpWrapper creator, int class_field_count,
+            int static_getter_count, int static_setter_count)
+#else
         public static void BeginClassRegister(Type type, RealStatePtr L, LuaCSFunction creator, int class_field_count,
             int static_getter_count, int static_setter_count)
+#endif
         {
+#if GEN_CODE_MINIMIZE
+            ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+#endif
             LuaAPI.lua_createtable(L, 0, class_field_count);
 
             int cls_table = LuaAPI.lua_gettop(L);
@@ -1061,7 +1093,11 @@ namespace XLua
             if (creator != null)
             {
                 LuaAPI.xlua_pushasciistring(L, "__call");
+#if GEN_CODE_MINIMIZE
+                translator.PushCSharpWrapper(L, creator);
+#else
                 LuaAPI.lua_pushstdcallcfunction(L, creator);
+#endif
                 LuaAPI.lua_rawset(L, -3);
             }
 
@@ -1281,8 +1317,12 @@ namespace XLua
                 if (parameterType.IsGenericParameter)
                 {
                     var parameterConstraints = parameterType.GetGenericParameterConstraints();
-                    if (parameterConstraints.Length == 0 || !parameterConstraints[0].IsClass())
-                        return false;
+                    if (parameterConstraints.Length == 0) return false;
+                    foreach (var parameterConstraint in parameterConstraints)
+                    {
+                        if (!parameterConstraint.IsClass || (parameterConstraint == typeof(ValueType)))
+                            return false;
+                    }
                     hasValidGenericParameter = true;
                 }
             }

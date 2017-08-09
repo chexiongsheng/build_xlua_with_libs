@@ -45,10 +45,20 @@ namespace XLua
             { "op_UnaryNegation", "__unm" },
             { "op_LessThan", "__lt" },
             { "op_LessThanOrEqual", "__le" },
-            { "op_Modulus", "__mod" }
+            { "op_Modulus", "__mod" },
+            { "op_BitwiseAnd", "__band" },
+            { "op_BitwiseOr", "__bor" },
+            { "op_ExclusiveOr", "__bxor" },
+            { "op_OnesComplement", "__bnot" },
+            { "op_LeftShift", "__shl" },
+            { "op_RightShift", "__shr" },
         };
 
         internal static Dictionary<Type, IEnumerable<MethodInfo>> extensionMethodMap = null;
+
+#if GEN_CODE_MINIMIZE
+        internal static LuaDLL.CSharpWrapperCaller CSharpWrapperCallerPtr = new LuaDLL.CSharpWrapperCaller(StaticLuaCallbacks.CSharpWrapperCallerImpl);
+#endif
     }
 
 }

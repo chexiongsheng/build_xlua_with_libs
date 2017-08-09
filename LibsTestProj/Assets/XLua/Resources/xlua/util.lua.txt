@@ -98,10 +98,49 @@ local function auto_id_map()
     end
 end
 
+--和xlua.hotfix的区别是：这个可以调用原来的函数
+local function hotfix_ex(cs, field, func)
+    assert(type(field) == 'string' and type(func) == 'function', 'invalid argument: #2 string needed, #3 function needed!')
+    local function func_after(...)
+        xlua.hotfix(cs, field, nil)
+        local ret = {func(...)}
+        xlua.hotfix(cs, field, func_after)
+        return unpack(ret)
+    end
+    xlua.hotfix(cs, field, func_after)
+end
+
+local function bind(func, obj)
+    return function(...)
+        return func(obj, ...)
+    end
+end
+
+--为了兼容luajit，lua53版本直接用|操作符即可
+local enum_or_op = debug.getmetatable(CS.System.Reflection.BindingFlags.Public).__bor
+local enum_or_op_ex = function(first, ...)
+    for _, e in ipairs({...}) do
+        first = enum_or_op(first, e)
+    end
+    return first
+end
+
+-- description: 直接用C#函数创建delegate
+local function createdelegate(delegate_cls, obj, impl_cls, method_name, parameter_type_list)
+    local flag = enum_or_op_ex(CS.System.Reflection.BindingFlags.Public, CS.System.Reflection.BindingFlags.NonPublic, 
+        CS.System.Reflection.BindingFlags.Instance, CS.System.Reflection.BindingFlags.Static)
+    local m = parameter_type_list and typeof(impl_cls):GetMethod(method_name, flag, nil, parameter_type_list, nil)
+             or typeof(impl_cls):GetMethod(method_name, flag)
+    return CS.System.Delegate.CreateDelegate(typeof(delegate_cls), obj, m)
+end
+
 return {
     async_to_sync = async_to_sync,
     coroutine_call = coroutine_call,
     cs_generator = cs_generator,
     loadpackage = loadpackage,
     auto_id_map = auto_id_map,
+    hotfix_ex = hotfix_ex,
+    bind = bind,
+    createdelegate = createdelegate,
 }
