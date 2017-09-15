@@ -46,14 +46,22 @@ namespace XLua
         internal int errorFuncRef = -1;
 
 #if THREAD_SAFE || HOTFIX_ENABLE
-        internal object luaEnvLock = new object();
+        internal static object luaLock = new object();
+
+        internal object luaEnvLock
+        {
+            get
+            {
+                return luaLock;
+            }
+        }
 #endif
 
-        const int LIB_VERSION_EXPECT = 102;
+        const int LIB_VERSION_EXPECT = 103;
 
         public LuaEnv()
         {
-            if (LuaAPI.xlua_get_lib_version() != LIB_VERSION_EXPECT)
+            if (LuaAPI.xlua_get_lib_version() != LIB_VERSION_EXPECT && LuaAPI.xlua_get_lib_version() != (LIB_VERSION_EXPECT -1))
             {
                 throw new InvalidProgramException("wrong lib version expect:"
                     + LIB_VERSION_EXPECT + " but got:" + LuaAPI.xlua_get_lib_version());

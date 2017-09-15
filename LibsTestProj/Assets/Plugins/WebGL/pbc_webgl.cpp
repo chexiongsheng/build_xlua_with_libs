@@ -1,0 +1,16 @@
+extern "C" {
+#include "../../../WebGLPlugins/alloc.c"
+#include "../../../WebGLPlugins/array.c"
+#include "../../../WebGLPlugins/bootstrap.c"
+#include "../../../WebGLPlugins/context.c"
+#include "../../../WebGLPlugins/decode.c"
+#include "../../../WebGLPlugins/map.c"
+#include "../../../WebGLPlugins/pattern.c"
+#include "../../../WebGLPlugins/proto.c"
+#include "../../../WebGLPlugins/register.c"
+#include "../../../WebGLPlugins/rmessage.c"
+#include "../../../WebGLPlugins/stringpool.c"
+#include "../../../WebGLPlugins/varint.c"
+#include "../../../WebGLPlugins/wmessage.c"
+#include "../../../WebGLPlugins/pbc-lua53.c"
+}

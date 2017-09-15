@@ -80,7 +80,7 @@ namespace XLua
 
         public virtual Delegate GetDelegateByType(Type type)
         {
-            throw new InvalidCastException("This type must add to CSharpCallLua: " + type);
+            return null;
         }
     }
 
@@ -127,7 +127,7 @@ namespace XLua
     {
         internal static DelegateBridge[] DelegateBridgeList = new DelegateBridge[0];
 
-        internal static bool Gen_Flag = false;
+        public static bool Gen_Flag = false;
 
         public DelegateBridge(int reference, LuaEnv luaenv) : base(reference, luaenv)
         {
