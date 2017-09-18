@@ -38,7 +38,10 @@ public class Helloworld : MonoBehaviour {
         ------------------------------------
         local lpeg = require 'lpeg'
         print(lpeg.match(lpeg.R '09','123'))
-        ------------------------------------
+"
+//webgl下，pbc register时就报out of memery，解决前例子先去掉
+#if !UNITY_WEBGL
++ @"        ------------------------------------
         local protobuf = require 'protobuf'
         protobuf.register(CS.UnityEngine.Resources.Load('proto/UserInfo.pb').bytes)
         protobuf.register(CS.UnityEngine.Resources.Load('proto/User.pb').bytes)
@@ -64,7 +67,9 @@ public class Helloworld : MonoBehaviour {
         assert(user.id == user_decode.id and user.info.diamond == user_decode.info.diamond)
         print('hello', user_decode.info.name)
 
-        ");
+        "
+#endif
+);
         luaenv.Dispose();
 	}
 	
