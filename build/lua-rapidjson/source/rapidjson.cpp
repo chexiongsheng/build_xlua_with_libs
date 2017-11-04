@@ -197,7 +197,8 @@ struct ToLuaHandler {
 	ToLuaHandler(lua_State* aL) : L(aL) { stack_.reserve(32); }
 
 	bool Null() {
-		json_null(L);
+		// json_null(L);
+		lua_pushnil(L);
 		current_.submit(L);
 		return true;
 	}
