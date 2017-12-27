@@ -298,7 +298,7 @@ namespace CSObjectWrapEditor
                 methodNames.Remove("set_" + setter.Name);
             }
             List<string> extension_methods_namespace = new List<string>();
-            var extension_methods = GetExtensionMethods(type).ToArray();
+            var extension_methods = type.IsInterface ? new MethodInfo[0]:GetExtensionMethods(type).ToArray();
             foreach(var extension_method in extension_methods)
             {
                 if (extension_method.DeclaringType.Namespace != null
@@ -312,12 +312,12 @@ namespace CSObjectWrapEditor
 
             //warnning: filter all method start with "op_"  "add_" "remove_" may  filter some ordinary method
             parameters.Set("methods", type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.IgnoreCase | BindingFlags.DeclaredOnly)
-                .Where(method => !method.IsDefined(typeof (ExtensionAttribute), false) || method.DeclaringType != type)
+                .Where(method => !method.IsDefined(typeof (ExtensionAttribute), false) || method.GetParameters()[0].ParameterType.IsInterface || method.DeclaringType != type)
                 .Where(method => methodNames.ContainsKey(method.Name)) //GenericMethod can not be invoke becuase not static info available!
                 .Concat(extension_methods)
                 .Where(method => !IsDoNotGen(type, method.Name))
                 .Where(method => !isMethodInBlackList(method) && (!method.IsGenericMethod || extension_methods.Contains(method) || isSupportedGenericMethod(method)) && !isObsolete(method) && !method.Name.StartsWith("op_") && !method.Name.StartsWith("add_") && !method.Name.StartsWith("remove_"))
-                .GroupBy(method => (method.Name + ((method.IsStatic && !method.IsDefined(typeof (ExtensionAttribute), false)) ? "_xlua_st_" : "")), (k, v) =>
+                .GroupBy(method => (method.Name + ((method.IsStatic && (!method.IsDefined(typeof (ExtensionAttribute), false) || method.GetParameters()[0].ParameterType.IsInterface)) ? "_xlua_st_" : "")), (k, v) =>
                 {
                     var overloads = new List<MethodBase>();
                     List<int> def_vals = new List<int>();
@@ -345,7 +345,7 @@ namespace CSObjectWrapEditor
                     }
                     return new {
                         Name = k,
-                        IsStatic = overloads[0].IsStatic && !overloads[0].IsDefined(typeof(ExtensionAttribute), false),
+                        IsStatic = overloads[0].IsStatic && (!overloads[0].IsDefined(typeof(ExtensionAttribute), false) || overloads[0].GetParameters()[0].ParameterType.IsInterface),
                         Overloads = overloads,
                         DefaultValues = def_vals
                     };

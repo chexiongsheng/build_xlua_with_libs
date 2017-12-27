@@ -29,7 +29,7 @@ namespace XLua
         internal LuaCSFunction StaticCSFunctionWraper, FixCSFunctionWraper;
 
         internal LuaCSFunction DelegateCtor;
-        
+
         public StaticLuaCallbacks()
         {
             GcMeta = new LuaCSFunction(StaticLuaCallbacks.LuaGC);
@@ -94,7 +94,7 @@ namespace XLua
                 LuaCSFunction func = (LuaCSFunction)translator.FastGetCSObj(L, LuaAPI.xlua_upvalueindex(1));
                 return func(L);
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 return LuaAPI.luaL_error(L, "c# exception in StaticCSFunction:" + e);
             }
@@ -1055,6 +1055,43 @@ namespace XLua
             catch (Exception e)
             {
                 return LuaAPI.luaL_error(L, "c# exception in delegate constructor: " + e);
+            }
+        }
+
+        [MonoPInvokeCallback(typeof(LuaCSFunction))]
+        public static int ToFunction(RealStatePtr L)
+        {
+            try
+            {
+                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+                MethodBase m;
+                translator.Get(L, 1, out m);
+                if (m == null)
+                {
+                    return LuaAPI.luaL_error(L, "ToFunction: #1 argument must be a MethodBase");
+                }
+                translator.PushFixCSFunction(L,
+                        new LuaCSFunction(translator.methodWrapsCache._GenMethodWrap(m.DeclaringType, m.Name, new MethodBase[] { m }).Call));
+                return 1;
+            }
+            catch (Exception e)
+            {
+                return LuaAPI.luaL_error(L, "c# exception in ToFunction: " + e);
+            }
+        }
+
+        [MonoPInvokeCallback(typeof(LuaCSFunction))]
+        public static int ReleaseCsObject(RealStatePtr L)
+        {
+            try
+            {
+                ObjectTranslator translator = ObjectTranslatorPool.Instance.Find(L);
+                translator.ReleaseCSObj(L, 1);
+                return 0;
+            }
+            catch (Exception e)
+            {
+                return LuaAPI.luaL_error(L, "c# exception in ReleaseCsObject: " + e);
             }
         }
     }
