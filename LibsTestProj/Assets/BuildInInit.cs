@@ -23,12 +23,12 @@ namespace XLua.LuaDLL
         }
 
         [DllImport(LUADLL, CallingConvention = CallingConvention.Cdecl)]
-        public static extern int luaopen_protobuf_c(System.IntPtr L);
+        public static extern int luaopen_pb(System.IntPtr L);
 
         [MonoPInvokeCallback(typeof(LuaDLL.lua_CSFunction))]
-        public static int LoadProtobufC(System.IntPtr L)
+        public static int LoadLuaProfobuf(System.IntPtr L)
         {
-            return luaopen_protobuf_c(L);
+            return luaopen_pb(L);
         }
     }
 }
