@@ -1,9 +1,9 @@
 xLua常用库集成
 =====
 
-## PBC
+## lua-protobuf
 
-云风的protobuf实现。
+https://github.com/starwing/lua-protobuf
 
 ## LuaSocket
 
