@@ -26,7 +26,7 @@ public class Helloworld : MonoBehaviour {
         LuaEnv luaenv = new LuaEnv();
         luaenv.AddBuildin("rapidjson", XLua.LuaDLL.Lua.LoadRapidJson);
         luaenv.AddBuildin("lpeg", XLua.LuaDLL.Lua.LoadLpeg);
-        luaenv.AddBuildin("protobuf.c", XLua.LuaDLL.Lua.LoadProtobufC);
+        luaenv.AddBuildin("pb", XLua.LuaDLL.Lua.LoadLuaProfobuf);
         luaenv.DoString(@"
         ------------------------------------
         local rapidjson = require 'rapidjson' 
@@ -38,37 +38,43 @@ public class Helloworld : MonoBehaviour {
         ------------------------------------
         local lpeg = require 'lpeg'
         print(lpeg.match(lpeg.R '09','123'))
-"
-//webgl下，pbc register时就报out of memery，解决前例子先去掉
-#if !UNITY_WEBGL
-+ @"        ------------------------------------
-        local protobuf = require 'protobuf'
-        protobuf.register(CS.UnityEngine.Resources.Load('proto/UserInfo.pb').bytes)
-        protobuf.register(CS.UnityEngine.Resources.Load('proto/User.pb').bytes)
+        ------------------------------------
+        local pb = require 'pb'
+        local protoc = require 'protoc'
 
-        local userInfo = {}
-        userInfo.name = 'world'
-        userInfo.diamond = 998
-        userInfo.level = 100
+        assert(protoc:load [[
+        message Phone {
+            optional string name        = 1;
+            optional int64  phonenumber = 2;
+        }
+        message Person {
+            optional string name     = 1;
+            optional int32  age      = 2;
+            optional string address  = 3;
+            repeated Phone  contacts = 4;
+        } ]])
 
-        local user = { }
-        user.id = 1
-        user.status = { 1,0,2,4}
-        user.pwdMd5 = 'md5'
-        user.regTime = '2017-03-29 12:00:00'
-        user.info = userInfo
+        local data = {
+        name = 'ilse',
+        age  = 18,
+            contacts = {
+                { name = 'alice', phonenumber = 12312341234 },
+                { name = 'bob',   phonenumber = 45645674567 }
+            }
+        }
 
-        --序列化
-        local encode = protobuf.encode('User', user)
+        local bytes = assert(pb.encode('Person', data))
+        print(pb.tohex(bytes))
 
-        -- 反序列化
-        local user_decode = protobuf.decode('User', encode)
-
-        assert(user.id == user_decode.id and user.info.diamond == user_decode.info.diamond)
-        print('hello', user_decode.info.name)
-
+        local data2 = assert(pb.decode('Person', bytes))
+        print(data2.name)
+        print(data2.age)
+        print(data2.address)
+        print(data2.contacts[1].name)
+        print(data2.contacts[1].phonenumber)
+        print(data2.contacts[2].name)
+        print(data2.contacts[2].phonenumber)
         "
-#endif
 );
         luaenv.Dispose();
 	}
