@@ -390,7 +390,7 @@ namespace XLua
 
             if (!gen_interfaces.Contains(to_be_impl))
             {
-                throw new InvalidCastException("This type must add to CSharpCallLua: " + to_be_impl);
+                throw new InvalidCastException("This type must add to CSharpCallLua: " + to_be_impl.GetFriendlyName());
             }
 
             TypeBuilder impl_type_builder = CodeEmitModule.DefineType("XLuaGenInterfaceImpl" + (genID++), TypeAttributes.Public | TypeAttributes.Class, typeof(LuaBase), new Type[] { to_be_impl});
@@ -421,14 +421,14 @@ namespace XLua
                         {
                             var getter_buildler = defineImplementMethod(impl_type_builder, property.GetGetMethod(), 
                                 MethodAttributes.Virtual | MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig);
-                            emitEmptyMethod(getter_buildler.GetILGenerator(), property.PropertyType);
+                            emitMethodImpl(property.GetGetMethod(), getter_buildler.GetILGenerator(), true);
                             prop_builder.SetGetMethod(getter_buildler);
                         }
                         if (property.CanWrite)
                         {
                             var setter_buildler = defineImplementMethod(impl_type_builder, property.GetSetMethod(),
                                 MethodAttributes.Virtual | MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig);
-                            emitEmptyMethod(setter_buildler.GetILGenerator(), property.PropertyType);
+                            emitMethodImpl(property.GetSetMethod(), setter_buildler.GetILGenerator(), true);
                             prop_builder.SetSetMethod(setter_buildler);
                         }
                         continue;
@@ -572,14 +572,14 @@ namespace XLua
                     {
                         var add_buildler = defineImplementMethod(impl_type_builder, event_info.GetAddMethod(),
                             MethodAttributes.Virtual | MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig);
-                        emitEmptyMethod(add_buildler.GetILGenerator(), typeof(void));
+                        emitMethodImpl(event_info.GetAddMethod(), add_buildler.GetILGenerator(), true);
                         event_builder.SetAddOnMethod(add_buildler);
                     }
                     if (event_info.GetRemoveMethod() != null)
                     {
                         var remove_buildler = defineImplementMethod(impl_type_builder, event_info.GetRemoveMethod(),
                             MethodAttributes.Virtual | MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig);
-                        emitEmptyMethod(remove_buildler.GetILGenerator(), typeof(void));
+                        emitMethodImpl(event_info.GetRemoveMethod(), remove_buildler.GetILGenerator(), true);
                         event_builder.SetRemoveOnMethod(remove_buildler);
                     }
                 }
@@ -1152,7 +1152,12 @@ namespace XLua
             var instanceMethods = toBeWrap.GetMethods(instanceFlag)
                 .Concat(extensionMethods == null ? Enumerable.Empty<MethodInfo>() : Utils.GetExtensionMethodsOf(toBeWrap))
                 .Where(m => Utils.IsSupportedMethod(m))
-                .Where(m => !m.IsSpecialName).GroupBy(m => m.Name).ToList();
+                .Where(m => !m.IsSpecialName
+                    || (
+                         ((m.Name == "get_Item" && m.GetParameters().Length == 1) || (m.Name == "set_Item" && m.GetParameters().Length == 2))
+                         && m.GetParameters()[0].ParameterType.IsAssignableFrom(typeof(string))
+                       )
+                ).GroupBy(m => m.Name).ToList();
             var supportOperators = toBeWrap.GetMethods(staticFlag)
                 .Where(m => m.IsSpecialName && InternalGlobals.supportOp.ContainsKey(m.Name))
                 .GroupBy(m => m.Name);
@@ -1183,7 +1188,7 @@ namespace XLua
                 var getter = prop.GetGetMethod();
                 if (getter != null && getter.IsPublic)
                 {
-                    if (prop.Name == "Item" && prop.GetIndexParameters().Length > 0)
+                    if (prop.GetIndexParameters().Length > 0)
                     {
                         if (!prop.GetIndexParameters()[0].ParameterType.IsAssignableFrom(typeof(string)))
                         {
@@ -1199,7 +1204,7 @@ namespace XLua
                 var setter = prop.GetSetMethod();
                 if (setter != null && setter.IsPublic)
                 {
-                    if (prop.Name == "Item" && prop.GetIndexParameters().Length > 0)
+                    if (prop.GetIndexParameters().Length > 0)
                     {
                         if (!prop.GetIndexParameters()[0].ParameterType.IsAssignableFrom(typeof(string)))
                         {
