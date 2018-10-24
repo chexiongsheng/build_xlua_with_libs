@@ -27,6 +27,7 @@ public class Helloworld : MonoBehaviour {
         luaenv.AddBuildin("rapidjson", XLua.LuaDLL.Lua.LoadRapidJson);
         luaenv.AddBuildin("lpeg", XLua.LuaDLL.Lua.LoadLpeg);
         luaenv.AddBuildin("pb", XLua.LuaDLL.Lua.LoadLuaProfobuf);
+        luaenv.AddBuildin("ffi", XLua.LuaDLL.Lua.LoadFFI);
         luaenv.DoString(@"
         ------------------------------------
         local rapidjson = require 'rapidjson' 
@@ -74,6 +75,29 @@ public class Helloworld : MonoBehaviour {
         print(data2.contacts[1].phonenumber)
         print(data2.contacts[2].name)
         print(data2.contacts[2].phonenumber)
+        ---------------------------------
+        local ffi = require('ffi')
+        ffi.cdef [[
+            typedef struct {int fake_id;unsigned int len;} CSSHeader;
+        ]]
+        ffi.cdef [[
+            typedef struct {
+                CSSHeader header;
+                float x;
+                float y;
+                float z;
+            } Vector3;
+        ]]
+
+        local Vector3Native = ffi.typeof('Vector3 *')
+        local v = CS.UnityEngine.Vector3(1, 2, 3)
+        local vn = ffi.cast(Vector3Native, v)
+        print(vn)
+        if vn.header.fake_id == -1 then
+            print('vector { ', vn.x, vn.y, vn.z, '}')
+        else
+            print('please gen code')
+        end
         "
 );
         luaenv.Dispose();

@@ -17,6 +17,12 @@ json处理，特点是Rapid。
 
 模式匹配库。
 
+## FFI for lua53
+
+基于这个项目的裁剪：https://github.com/facebookarchive/luaffifb
+
+裁剪掉函数调用部分，这部分需要用到jit，有些系统行不同（比如ios），故裁剪掉。
+
 ## 如何使用
 
 * 用lua53版本的用build/plugin_lua53下的Plugins覆盖Unity工程Assets下对应的目录，注意是覆盖，别删除后拷贝，如果你要用luajit，用build/plugin_luajit下的

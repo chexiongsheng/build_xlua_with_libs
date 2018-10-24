@@ -77,6 +77,20 @@ list(APPEND THIRDPART_INC  lpeg)
 set (THIRDPART_SRC ${THIRDPART_SRC} ${LPEG_SRC})
 #end lpeg
 
+#begin FFI
+if (NOT USING_LUAJIT)
+	set (FFI_SRC ffi/parser.c ffi/ctype.c ffi/ffi.c)
+	set_property(
+		SOURCE ${FFI_SRC}
+		APPEND
+		PROPERTY COMPILE_DEFINITIONS
+		LUA_LIB
+	)
+	list(APPEND THIRDPART_INC  ffi)
+	set (THIRDPART_SRC ${THIRDPART_SRC} ${FFI_SRC})
+endif ()
+#end FFI
+
 if (USING_LUAJIT)
 	
     if (APPLE AND NOT IOS)
