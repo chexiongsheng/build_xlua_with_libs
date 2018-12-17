@@ -84,7 +84,7 @@ end
 
 function Lexer:comment()
    local pos = self "^%/%/[^\n]*\n?()"
-   if pos then
+   if not pos then
       if self "^%/%*" then
          pos = self "^%/%*.-%*%/()"
          if not pos then
@@ -172,7 +172,7 @@ function Lexer:number(opt)
    if not ns then
       return self:opterror(opt, 'floating-point number expected')
    end
-   local es, pos2 = self("([eE][+-]?[0-9]+)%s*()", pos)
+   local es, pos2 = self("(^[eE][+-]?[0-9]+)%s*()", pos)
    if d1 == "." and d2 == "." then
       return self:error "malformed floating-point number"
    end
@@ -266,7 +266,7 @@ function Parser:parsefile(name)
    if info then return info end
    local errors = {}
    for _, path in ipairs(self.paths) do
-      local fn = path.."/"..name
+      local fn = path ~= "" and path.."/"..name or name
       local fh, err = io.open(fn)
       if fh then
          local content = fh:read "*a"
@@ -381,22 +381,27 @@ local function field(self, lex, ident)
    local name, type, type_name, map_entry
    if ident == "map" and lex:test "%<" then
       name, type, type_name, map_entry = map_info(lex)
+      self.locmap[map_entry.field[1]] = lex.pos
+      self.locmap[map_entry.field[2]] = lex.pos
       register_type(self, lex, type_name, types.message)
    else
       type, type_name = type_info(lex, ident)
       name = lex:ident()
    end
    local info = {
-      name      = name;
-      number    = lex:expected "=":integer();
-      label     = labels.optional;
-      type      = type;
-      type_name = type_name;
+      name      = name,
+      number    = lex:expected "=":integer(),
+      label     = ident == "map" and labels.repeated or labels.optional,
+      type      = type,
+      type_name = type_name
    }
    local options = inline_option(lex)
    if options then
       info.default_value, options.default = tostring(options.default), nil
       info.json_name, options.json_name = options.json_name, nil
+      if options.packed and options.packed == "false" then
+         options.packed = false
+      end
    end
    info.options = options
    if info.number <= 0 then
@@ -420,47 +425,6 @@ local function label_field(self, lex, ident)
    info, map_entry = field(self, lex, lex:type_name())
    info.label = label
    return info, map_entry
-end
-
-local function make_subparser(self, lex)
-   local sub = {
-      syntax  = "proto2";
-      locmap  = {};
-      prefix  = ".";
-      lex     = lex;
-      parent  = self;
-   }
-   sub.loaded  = self.loaded
-   sub.typemap = self.typemap
-   sub.paths   = self.paths
-
-   function sub.import_fallback(import_name)
-      if self.unknown_import == true then
-         return true
-      elseif type(self.unknown_import) == 'string' then
-         return import_name:match(self.unknown_import) and true or nil
-      elseif self.unknown_import then
-         return self:unknown_import(import_name)
-      end
-   end
-
-   function sub.type_fallback(type_name)
-      if self.unknown_type == true then
-         return true
-      elseif type(self.unknown_type) == 'string' then
-         return type_name:match(self.unknown_type) and true
-      elseif self.unknown_type then
-         return self:unknown_type(type_name)
-      end
-   end
-
-   function sub.on_import(info)
-      if self.on_import then
-         return self.on_import(info)
-      end
-   end
-
-   return setmetatable(sub, Parser)
 end
 
 local toplevel = {} do
@@ -576,6 +540,7 @@ function msg_body:oneof(lex, info)
          toplevel.option(self, lex, oneof)
       else
          local f, t = field(self, lex, ident, "no_label")
+         self.locmap[f] = lex.pos
          if t then ts[#ts+1] = t end
          f.oneof_index = index - 1
          fs[#fs+1] = f
@@ -736,9 +701,48 @@ end
 
 end
 
-function Parser:parse(src, name)
-   name = name or "<input>"
+local function make_context(self, lex)
+   local ctx = {
+      syntax  = "proto2";
+      locmap  = {};
+      prefix  = ".";
+      lex     = lex;
+      parser  = self;
+   }
+   ctx.loaded  = self.loaded
+   ctx.typemap = self.typemap
+   ctx.paths   = self.paths
 
+   function ctx.import_fallback(import_name)
+      if self.unknown_import == true then
+         return true
+      elseif type(self.unknown_import) == 'string' then
+         return import_name:match(self.unknown_import) and true or nil
+      elseif self.unknown_import then
+         return self:unknown_import(import_name)
+      end
+   end
+
+   function ctx.type_fallback(type_name)
+      if self.unknown_type == true then
+         return true
+      elseif type(self.unknown_type) == 'string' then
+         return type_name:match(self.unknown_type) and true
+      elseif self.unknown_type then
+         return self:unknown_type(type_name)
+      end
+   end
+
+   function ctx.on_import(info)
+      if self.on_import then
+         return self.on_import(info)
+      end
+   end
+
+   return setmetatable(ctx, Parser)
+end
+
+function Parser:parse(src, name)
    local loaded = self.loaded[name]
    if loaded then
       if loaded == true then
@@ -747,10 +751,11 @@ function Parser:parse(src, name)
       return loaded
    end
 
-   local lex = Lexer.new(name or "<input>", src)
+   name = name or "<input>"
+   local lex = Lexer.new(name, src)
    local info = { name = lex.name }
    if name then self.loaded[name] = true end
-   local ctx = make_subparser(self, lex)
+   local ctx = make_context(self, lex)
 
    local syntax = lex:keyword('syntax', 'opt')
    if syntax then
@@ -842,9 +847,9 @@ local function check_enum(self, lex, info)
    for _, v in iter(info, 'value') do
       lex.pos = self.locmap[v]
       check_dup(self, lex, 'enum name', names, 'name', v)
-      if info.options and info.options.options and info.options.options.allow_alias then
-          --nothing todo for allow_alias skip the enum value check
-      else
+      if not (info.options
+              and info.options.options
+              and info.options.options.allow_alias) then
           check_dup(self, lex, 'enum number', numbers, 'number', v)
       end
    end
@@ -854,13 +859,16 @@ local function check_message(self, lex, info)
    self.prefix[#self.prefix+1] = info.name
    local names, numbers = {}, {}
    for _, v in iter(info, 'field') do
-      lex.pos = self.locmap[v]
+      lex.pos = assert(self.locmap[v])
       check_dup(self, lex, 'field name', names, 'name', v)
       check_dup(self, lex, 'field number', numbers, 'number', v)
       check_field(self, lex, v)
    end
+   for _, v in iter(info, 'nested_type') do
+      check_message(self, lex, v)
+   end
    for _, v in iter(info, 'extension') do
-      lex.pos = self.locmap[v]
+      lex.pos = assert(self.locmap[v])
       check_field(self, lex, v)
    end
    self.prefix[#self.prefix] = nil
@@ -896,7 +904,7 @@ function Parser:resolve(lex, info)
       check_service(self, lex, v)
    end
    for _, v in iter(info, 'extension') do
-      lex.pos = self.locmap[v]
+      lex.pos = assert(self.locmap[v])
       check_field(self, lex, v)
    end
    self.prefix = nil
@@ -1022,12 +1030,12 @@ end
 
 function Parser:compile(s, name)
    local set = do_compile(self, self.parse, self, s, name)
-   return assert(pb.encode('.google.protobuf.FileDescriptorSet', set))
+   return pb.encode('.google.protobuf.FileDescriptorSet', set)
 end
 
 function Parser:compilefile(fn)
    local set = do_compile(self, self.parsefile, self, fn)
-   return assert(pb.encode('.google.protobuf.FileDescriptorSet', set))
+   return pb.encode('.google.protobuf.FileDescriptorSet', set)
 end
 
 function Parser:load(s, name)
