@@ -5,14 +5,6 @@ cd %~dp0\luajit-2.1.0b3\src
 call msvcbuild_mt.bat static
 cd ..\..
 
-goto :buildxlua
-
-:missing
-echo Can't find Visual Studio 2015.
-pause
-goto :eof
-
-:buildxlua
 mkdir build_lj32 & pushd build_lj32
 cmake -DUSING_LUAJIT=ON -G "Visual Studio 15 2017" ..
 popd
