@@ -1156,6 +1156,9 @@ static int Lpb_load(lua_State *L) {
 }
 
 static int Lpb_loadfile(lua_State *L) {
+#if defined(WINAPI_FAMILY_PARTITION)
+  return luaL_error(L, "unsupport api in uwp platform");
+#else
     pb_State *S = default_state(L);
     const char *filename = luaL_checkstring(L, 1);
     size_t size;
@@ -1179,6 +1182,7 @@ static int Lpb_loadfile(lua_State *L) {
     lua_pushboolean(L, ret == PB_OK);
     lua_pushinteger(L, lpb_offset(&s));
     return 2;
+#endif
 }
 
 static int lpb_pushtype(lua_State *L, pb_Type *t) {
