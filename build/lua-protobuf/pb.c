@@ -520,6 +520,9 @@ static int io_write(lua_State *L, FILE *f, int idx) {
 }
 
 static int Lio_read(lua_State *L) {
+#if defined(WINAPI_FAMILY_PARTITION)
+  return luaL_error(L, "unsupport api in uwp platform");
+#else
     const char *fname = luaL_optstring(L, 1, NULL);
     FILE *fp = stdin;
     int ret;
@@ -534,18 +537,26 @@ static int Lio_read(lua_State *L) {
     else (void)setmode(fileno(stdin), O_TEXT);
     if (ret != LUA_OK) { lua_pushnil(L); lua_insert(L, -2); return 2; }
     return 1;
+#endif
 }
 
 static int Lio_write(lua_State *L) {
+#if defined(WINAPI_FAMILY_PARTITION)
+  return luaL_error(L, "unsupport api in uwp platform");
+#else
     int res;
     (void)setmode(fileno(stdout), O_BINARY);
     res = io_write(L, stdout, 1);
     fflush(stdout);
     (void)setmode(fileno(stdout), O_TEXT);
     return res;
+#endif
 }
 
 static int Lio_dump(lua_State *L) {
+#if defined(WINAPI_FAMILY_PARTITION)
+  return luaL_error(L, "unsupport api in uwp platform");
+#else
     int res;
     const char *fname = luaL_checkstring(L, 1);
     FILE *fp = fopen(fname, "wb");
@@ -553,6 +564,7 @@ static int Lio_dump(lua_State *L) {
     res = io_write(L, fp, 2);
     fclose(fp);
     return res;
+#endif
 }
 
 LUALIB_API int luaopen_pb_io(lua_State *L) {
