@@ -633,10 +633,20 @@ namespace XLua
         }
 #endif
 
+#if !UNITY_SWITCH || UNITY_EDITOR
         [MonoPInvokeCallback(typeof(LuaCSFunction))]
         internal static int LoadSocketCore(RealStatePtr L)
         {
             return LuaAPI.luaopen_socket_core(L);
+        }
+#endif
+
+        [MonoPInvokeCallback(typeof(LuaCSFunction))]
+        internal static int LoadCS(RealStatePtr L)
+        {
+            LuaAPI.xlua_pushasciistring(L, LuaEnv.CSHARP_NAMESPACE);
+            LuaAPI.lua_rawget(L, LuaIndexes.LUA_REGISTRYINDEX);
+            return 1;
         }
 
         [MonoPInvokeCallback(typeof(LuaCSFunction))]
