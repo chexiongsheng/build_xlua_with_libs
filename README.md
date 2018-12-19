@@ -5,6 +5,18 @@ xLua常用库集成
 
 https://github.com/starwing/lua-protobuf
 
+ps：如果需要用pbc的，可以修改编译参数指定改为用pbc，以window 64位为例，打开make_win64_lua53.bat，找到这行：
+
+~~~bash
+cmake -G "Visual Studio 14 2015 Win64" ..
+~~~
+
+修改为
+
+~~~bash
+cmake -DPBC=ON -G "Visual Studio 14 2015 Win64" ..
+~~~
+
 ## LuaSocket
 
 xLua默认集成库。
