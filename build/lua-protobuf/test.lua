@@ -96,7 +96,7 @@ function _G.test_io.test()
    fail("string expected for field 'name', got boolean",
         function() pb.encode("Person", { name = true }) end)
 
-   fail("type mismatch at offset 2, bytes expected for type string, got varint",
+   fail("type mismatch for field 'name' at offset 2, bytes expected for type string, got varint",
         function() pb.decode("Person", "\8\1") end)
 
    fail("invalid varint value at offset 2",
@@ -242,6 +242,7 @@ function _G.test_extend()
 end
 
 function _G.test_type()
+   pb.clear "not-exists"
    check_load [[
    message TestTypes {
       optional double   dv    = 1;
@@ -374,6 +375,8 @@ function _G.test_default()
          repeated int32 array = 18;
       } ]]
 
+   local _, _, _, _, rep = pb.field("TestDefault", "foo")
+   eq(rep, "optional")
    table_eq(copy_no_meta(pb.defaults "TestDefault"), {
             defaulted_int = 0,
             defaulted_bool = false,
@@ -904,11 +907,16 @@ function _G.test_load()
    do
       local old = pb.state(nil)
       protoc.reload()
+      assert(protoc:load [[ message Test_Load1 { optional int32 t = 1; } ]])
+      assert(pb.type "Test_Load1")
+      assert(protoc:load [[ message Test_Load2 { optional int32 t = 2; } ]])
+      assert(pb.type "Test_Load2")
+      protoc.reload()
       local p = protoc.new()
-      assert(p:load [[ message Test1 { optional int32 t = 1; } ]])
-      assert(pb.type "Test1")
-      assert(p:load [[ message Test2 { optional int32 t = 2; } ]])
-      assert(pb.type "Test2")
+      assert(p:load [[ message Test_Load1 { optional int32 t = 1; } ]])
+      assert(pb.type "Test_Load1")
+      assert(p:load [[ message Test_Load2 { optional int32 t = 2; } ]])
+      assert(pb.type "Test_Load2")
       pb.state(old)
    end
 
@@ -955,17 +963,17 @@ function _G.test_load()
             s(1), s(4), s(1), "load_test",
             s(2), s(1), "test_unknown", v(3), 1, v(4), 1)
    eq(pb.load(buf:result()), true)
-   fail("type mismatch at offset 2, <unknown> expected for type <unknown>, got varint",
+   fail("type mismatch for field 'test_unknown' at offset 2, <unknown> expected for type <unknown>, got varint",
             function() pb.decode("load_test", "\8\1") end)
-   fail("type mismatch at offset 2, <unknown> expected for type <unknown>, got 64bit",
+   fail("type mismatch for field 'test_unknown' at offset 2, <unknown> expected for type <unknown>, got 64bit",
             function() pb.decode("load_test", "\9\1") end)
-   fail("type mismatch at offset 2, <unknown> expected for type <unknown>, got bytes",
+   fail("type mismatch for field 'test_unknown' at offset 2, <unknown> expected for type <unknown>, got bytes",
             function() pb.decode("load_test", "\10\1") end)
-   fail("type mismatch at offset 2, <unknown> expected for type <unknown>, got gstart",
+   fail("type mismatch for field 'test_unknown' at offset 2, <unknown> expected for type <unknown>, got gstart",
             function() pb.decode("load_test", "\11\1") end)
-   fail("type mismatch at offset 2, <unknown> expected for type <unknown>, got gend",
+   fail("type mismatch for field 'test_unknown' at offset 2, <unknown> expected for type <unknown>, got gend",
             function() pb.decode("load_test", "\12\1") end)
-   fail("type mismatch at offset 2, <unknown> expected for type <unknown>, got 32bit",
+   fail("type mismatch for field 'test_unknown' at offset 2, <unknown> expected for type <unknown>, got 32bit",
             function() pb.decode("load_test", "\13\1") end)
 
    buf:reset()
