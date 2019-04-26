@@ -24,6 +24,7 @@ option ( UINT_ESPECIALLY "using custom ulong" OFF )
 option ( USING_LUAJIT "using luajit" OFF )
 option ( GC64 "using gc64" OFF )
 option ( LUAC_COMPATIBLE_FORMAT "compatible format" OFF )
+option ( PBC "using pbc" OFF )
 
 find_path(XLUA_PROJECT_DIR NAMES SConstruct
     PATHS 
@@ -47,19 +48,55 @@ list(APPEND THIRDPART_INC  lua-rapidjson/include)
 set (THIRDPART_SRC ${THIRDPART_SRC} ${RAPIDJSON_SRC})
 #end lua-rapidjson
 
-#begin lua-profobuf
-set (LPB_SRC 
-    lua-protobuf/pb.c
-)
-set_property(
-	SOURCE ${LPB_SRC}
-	APPEND
-	PROPERTY COMPILE_DEFINITIONS
-	LUA_LIB
-)
-list(APPEND THIRDPART_INC lua-protobuf)
-set (THIRDPART_SRC ${THIRDPART_SRC} ${LPB_SRC})
-#end lua-protobuf
+if (NOT PBC)
+	#begin lua-profobuf
+	set (LPB_SRC 
+		lua-protobuf/pb.c
+	)
+	set_property(
+		SOURCE ${LPB_SRC}
+		APPEND
+		PROPERTY COMPILE_DEFINITIONS
+		LUA_LIB
+	)
+	list(APPEND THIRDPART_INC lua-protobuf)
+	set (THIRDPART_SRC ${THIRDPART_SRC} ${LPB_SRC})
+	#end lua-protobuf
+else()
+	#begin pbc
+	set (PBC_SRC 
+		pbc/src/alloc.c
+		pbc/src/array.c
+		pbc/src/array.c
+		pbc/src/bootstrap.c
+		pbc/src/context.c
+		pbc/src/decode.c
+		pbc/src/map.c
+		pbc/src/pattern.c
+		pbc/src/proto.c
+		pbc/src/register.c
+		pbc/src/rmessage.c
+		pbc/src/stringpool.c
+		pbc/src/varint.c
+		pbc/src/wmessage.c
+	)
+
+	if (USING_LUAJIT)
+		list(APPEND PBC_SRC pbc pbc/binding/lua/pbc-lua.c)
+	else ()
+		list(APPEND PBC_SRC pbc pbc/binding/lua53/pbc-lua53.c)
+	endif ()
+
+	set_property(
+		SOURCE ${PBC_SRC}
+		APPEND
+		PROPERTY COMPILE_DEFINITIONS
+		LUA_LIB
+	)
+	list(APPEND THIRDPART_INC pbc pbc/src)
+	set (THIRDPART_SRC ${THIRDPART_SRC} ${PBC_SRC})
+	#end pbc
+endif ()
 
 #begin lpeg
 set ( LPEG_SRC
