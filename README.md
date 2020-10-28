@@ -37,7 +37,7 @@ json处理，特点是Rapid。
 
 ## 如何使用
 
-* 用lua53版本的用build/plugin_lua53下的Plugins覆盖Unity工程Assets下对应的目录，注意是覆盖，别删除后拷贝，如果你要用luajit，用build/plugin_luajit下的
+* 到[自动编译](https://github.com/chexiongsheng/build_xlua_with_libs/actions)下载你希望使用的版本（lua53,lua54, luajit），解压覆盖Unity工程Assets下Plugins目录，注意是覆盖，别删除后拷
 * 把LibsTestProj/Assets下的BuildInInit.cs和Resources目录放到Unity工程Assets下
 * 库的初始化看实例：LibsTestProj/Assets/Helloworld/Helloworld.cs
 
