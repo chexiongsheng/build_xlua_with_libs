@@ -15,6 +15,33 @@ jobs:
       - name: Install NDK
         run: |
           cd ~
+          wget -O NDK -q https://dl.google.com/android/repository/android-ndk-r21b-linux-x86_64.zip
+          sudo apt install unzip -y
+          unzip -q NDK
+          ANDROID_NDK_HOME=$(pwd)/android-ndk-r21b
+      - name: Build
+        run: |
+          cd build
+          ./make_android_lua54.sh
+          ./make_android_lua53.sh
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          path: ./build/plugin_lua54/**/*
+          name: plugin_lua54_android
+      - name: Upload53
+        uses: actions/upload-artifact@v4
+        with:
+          path: ./build/plugin_lua53/**/*
+          name: plugin_lua53_android 
+
+  android_luajit:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install NDK
+        run: |
+          cd ~
           wget -O NDK -q https://dl.google.com/android/repository/android-ndk-r15c-linux-x86_64.zip
           sudo apt install unzip -y
           unzip -q NDK
@@ -22,25 +49,44 @@ jobs:
       - name: Build
         run: |
           cd build
-          ./make_android_lua54.sh
-          ./make_android_lua53.sh
-          sudo apt install gcc-multilib
-          ./make_android_luajit_arm64.sh
-      - name: Upload
-        uses: actions/upload-artifact@v2
-        with:
-          path: ./build/plugin_lua54/**/*
-          name: plugin_lua54
-      - name: Upload53
-        uses: actions/upload-artifact@v2
-        with:
-          path: ./build/plugin_lua53/**/*
-          name: plugin_lua53   
+          sudo apt update
+          sudo apt install gcc-multilib libncurses5 -y
+          ./make_android_luajit_arm64.sh  
       - name: UploadJit
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           path: ./build/plugin_luajit/**/*
-          name: plugin_luajit
+          name: plugin_luajit_android
+  
+  ohos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install NDK
+        run: |
+          cd ~
+          cd ~
+          curl -O https://repo.huaweicloud.com/harmonyos/os/4.1-Release/ohos-sdk-windows_linux-public.tar.gz
+          tar xvfz ohos-sdk-windows_linux-public.tar.gz
+          cd ohos-sdk/linux
+          unzip -o -d ./ native-linux-x64-4.1.7.5-Release.zip
+      - name: Build
+        run: |
+          cd build
+          chmod +x make_ohos_lua5*.sh
+          OHOS_NDK_HOME=~/ohos-sdk/linux/native ./make_ohos_lua54.sh
+          OHOS_NDK_HOME=~/ohos-sdk/linux/native ./make_ohos_lua53.sh
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          path: ./build/plugin_lua54/**/*
+          name: plugin_lua54_ohos
+      - name: Upload53
+        uses: actions/upload-artifact@v4
+        with:
+          path: ./build/plugin_lua53/**/*
+          name: plugin_lua53_ohos
+
   linux:
     runs-on: ubuntu-latest
     steps:
@@ -52,20 +98,20 @@ jobs:
           ./make_linux64_lua53.sh
           ./make_linux64_luajit.sh
       - name: Upload
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           path: ./build/plugin_lua54/**/*
-          name: plugin_lua54
+          name: plugin_lua54_linux  
       - name: Upload53
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           path: ./build/plugin_lua53/**/*
-          name: plugin_lua53   
+          name: plugin_lua53_linux     
       - name: UploadJit
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           path: ./build/plugin_luajit/**/*
-          name: plugin_luajit  
+          name: plugin_luajit_linux  
   ios:
     runs-on: macos-latest
 
@@ -78,22 +124,22 @@ jobs:
           ./make_ios_lua53.sh
           ./make_ios_luajit.sh
       - name: Upload
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           path: ./build/plugin_lua54/**/*
-          name: plugin_lua54
+          name: plugin_lua54_ios
       - name: Upload53
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           path: ./build/plugin_lua53/**/*
-          name: plugin_lua53   
+          name: plugin_lua53_ios   
       - name: UploadJit
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           path: ./build/plugin_luajit/**/*
-          name: plugin_luajit
+          name: plugin_luajit_ios
   osx:
-    runs-on: macos-10.15
+    runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v2
@@ -103,23 +149,25 @@ jobs:
           ./make_osx_lua54.sh
           ./make_osx_lua53.sh
           ./make_osx_luajit.sh
+          ./make_osx_silicon_lua53.sh
+          ./make_osx_silicon_lua54.sh
       - name: Upload
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           path: ./build/plugin_lua54/**/*
-          name: plugin_lua54
+          name: plugin_lua54_osx  
       - name: Upload53
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           path: ./build/plugin_lua53/**/*
-          name: plugin_lua53   
+          name: plugin_lua53_osx     
       - name: UploadJit
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           path: ./build/plugin_luajit/**/*
-          name: plugin_luajit  
+          name: plugin_luajit_osx  
   windows:
-    runs-on: windows-2016
+    runs-on: windows-2022
 
     steps:
       - uses: actions/checkout@v2
@@ -131,47 +179,74 @@ jobs:
         run: |
           cd build
           .\make_win_lua54.bat
+          .\make_uwp_lua54.bat
           .\make_win32_lua53.bat
           .\make_win64_lua53.bat
+          .\make_uwp.bat
       - uses: ilammy/msvc-dev-cmd@v1
       - name: Build Luajit
         run: |
           cd build
           .\make_win64_luajit.bat
       - name: Upload
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           path: ./build/plugin_lua54/**/*
-          name: plugin_lua54
+          name: plugin_lua54_window
       - name: Upload53
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           path: ./build/plugin_lua53/**/*
-          name: plugin_lua53   
+          name: plugin_lua53_window   
       - name: UploadJit
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           path: ./build/plugin_luajit/**/*
-          name: plugin_luajit
+          name: plugin_luajit_window
+          
+  windows-luajit-32:
+    runs-on: windows-2022
+
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Insatll MSVC
+        uses: microsoft/setup-msbuild@v1.0.2
+      
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x86
+      - name: Build Luajit
+        run: |
+          cd build
+          .\make_win32_luajit.bat  
+      - name: UploadJit
+        uses: actions/upload-artifact@v4
+        with:
+          path: ./build/plugin_luajit/**/*
+          name: plugin_luajit_window32
 
   publish:
     runs-on: ubuntu-latest
-    needs: [windows,osx,ios,android]
+    needs: [windows,osx,ios,android,windows-luajit-32,ohos,android_luajit,linux]
     steps:
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4
         with:
-          name: plugin_luajit
+          pattern: plugin_luajit_*
           path: plugin_luajit/
+          merge-multiple: true
           
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4
         with:
-          name: plugin_lua53
+          pattern: plugin_lua53_*
           path: plugin_lua53/
+          merge-multiple: true
           
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4
         with:
-          name: plugin_lua54
+          pattern: plugin_lua54_*
           path: plugin_lua54/
+          merge-multiple: true
           
       - name: Create Release Asset
         run: |
@@ -222,3 +297,4 @@ jobs:
           asset_path: ./lua54_${{ github.event.inputs.tag_name }}.tgz
           asset_name: lua54_${{ github.event.inputs.tag_name }}.tgz
           asset_content_type: application/tgz
+   

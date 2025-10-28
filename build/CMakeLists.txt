@@ -4,7 +4,7 @@
 # http://opensource.org/licenses/MIT
 # Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.5)
 
 if ( WIN32 AND NOT CYGWIN AND NOT ( CMAKE_SYSTEM_NAME STREQUAL "WindowsStore" ) AND NOT ANDROID)
 	set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MT" CACHE STRING "")
@@ -240,6 +240,7 @@ source_group_by_dir(${CMAKE_CURRENT_SOURCE_DIR} XLUA_CORE)
 
 if (APPLE)
     if (IOS)
+        ADD_DEFINITIONS(-DLUA_USE_IOS) # Despite claiming to be ISO C, iOS does not implement 'system'.(iOS11)
         set(CMAKE_OSX_ARCHITECTURES "$(ARCHS_STANDARD)")
         add_library(xlua STATIC
            ${LUA_CORE}
@@ -330,4 +331,8 @@ else ( )
             ${THIRDPART_LIB} 
         )
     endif()
+endif ( )
+
+if ( ANDROID )
+    target_link_options(xlua PRIVATE -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384) # android 16K Pagesize
 endif ( )
